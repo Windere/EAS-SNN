@@ -2,7 +2,9 @@
 <p align="center">
   <img src="./docs/view.png" width="750">
 </p>
-This is the official Pytorch implementation of the ECCV 2024 paper [End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks](https://arxiv.org/abs/2403.12574)
+This is the official Pytorch implementation of the ECCV 2024 paper: <a href="https://arxiv.org/abs/2403.12574" target="_blank">EAS-SNN: End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks</a>
+
+
 
  **Summary:** In this study, we discover that the neural dynamics of spiking neurons align closely with the behavior of an ideal temporal event sampler. Motivated by this, we propose a novel adaptive sampling module that leverages recurrent convolutional SNNs enhanced with temporal memory, facilitating a fully end-to-end learnable framework for event-based detection. Additionally, we introduce Residual Potential Dropout (RPD) and Spike-Aware Training (SAT) to regulate potential distribution and address performance degradation encountered in spike-based sampling modules.  
 
@@ -21,7 +23,8 @@ The main dependencies are listed below:
 | opencv         | 4.7.0   |
 | numpy          | 1.26.0  |
 | einops         | 0.8.0   |
-|python          |          3.10.9|
+|python     |   3.10.9|
+
 You can try to install the required packages by running:
 ```bash 
 conda env create -f environment.yml
@@ -136,7 +139,6 @@ This project has adpated code from the following libraries:
 * [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) for the detection PAFPN/head
 * [Tonic](https://github.com/neuromorphs/tonic) for the event-based representation, like voxel grid
 * [RVT](https://github.com/uzh-rpg/RVT/tree/master) for the 1Mpx preprocessed dataset and the Prophesee evaluation tool
-* [ASGL](https://github.com/Windere/ASGL-SNN) and [SpikingJelly](https://github.com/fangwei123456/spikingjelly) for the SNN implementation
-* [Spikingjelly](https://github.com/fangwei123456/spikingjelly) for event visualization
+* [ASGL](https://github.com/Windere/ASGL-SNN) and [SpikingJelly](https://github.com/fangwei123456/spikingjelly) for the SNN implementation and event visualization
 
 
