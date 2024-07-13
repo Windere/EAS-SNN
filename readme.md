@@ -5,7 +5,6 @@
 This is the official Pytorch implementation of the ECCV 2024 paper: <a href="https://arxiv.org/abs/2403.12574" target="_blank">EAS-SNN: End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks</a>
 
 
-
  **Summary:** In this study, we discover that the neural dynamics of spiking neurons align closely with the behavior of an ideal temporal event sampler. Motivated by this, we propose a novel adaptive sampling module that leverages recurrent convolutional SNNs enhanced with temporal memory, facilitating a fully end-to-end learnable framework for event-based detection. Additionally, we introduce Residual Potential Dropout (RPD) and Spike-Aware Training (SAT) to regulate potential distribution and address performance degradation encountered in spike-based sampling modules.  
 
 
@@ -27,7 +26,7 @@ The main dependencies are listed below:
 
 You can try to install the required packages by running:
 ```bash 
-conda env create -f environment.yml
+conda env create -f conda-env.yml
 ```
 or
 ```bash
@@ -41,17 +40,17 @@ pip install -r pip-requirements.txt
 
 3. The preprocessed 1Mpx dataset by RVT can be downloaded from [here](https://download.ifi.uzh.ch/rpg/RVT/datasets/preprocessed/gen4.tar)
 
-4. The raw N-Caltech 101 dataset by RVT can be downloaded from [here](https://www.garrickorchard.com/datasets/n-caltech101)
+4. The raw N-Caltech 101 dataset can be downloaded from [here](https://www.garrickorchard.com/datasets/n-caltech101)
 
 After unzipping the dataset, you should have the following directory structure:
 ```shell
-    # The Splited N-Caltech101 Dataset
+    # The Splitted N-Caltech101 Dataset
     ├── N-Caltech
     │   ├── Caltech101
     │   ├── Caltech101_annotations
     │   ├── test.txt
     │   ├── train.txt
-    │   ├── val.txt
+    │   └── val.txt
     
     #  The raw 1Mpx/Gen1 dataset
     ├── Root Directory
@@ -113,14 +112,23 @@ After unzipping the dataset, you should have the following directory structure:
      seed 80 data_name gen1 data_dir /data2/wzm/dataset/GEN1/raw/ num_classes 2 scheduler fixed spike_attach True \
       thresh 1 readout sum embedding_depth 2 embedding_ksize 5 write_zero True  use_spike full_spike_v2 spike_fn atan
        ```
-3. Run the following command to evaluate an EAS-SNN model on the GEN-1 dataset:
+3. Run the following command to train an EAS-SNN model on the N-Caltech dataset:
+    ```bash
+    CUDA_VISIBLE_DEVICES=0,1,2,3  python train_event.py -n e-yolox-m -d 4 -b 32 -expn exp_name \ 
+   max_epoch 60 data_num_workers 2 eval_interval 10 embedding arsnn basic_lr_per_img  0.000009375 \
+   seed 80 data_dir /data2/wzm/dataset/N-Caltech/ no_aug_epochs 0 Tm 4 T 3 scheduler fixed \
+    spike_attach True  write_zero True readout sum use_spike full_spike_v2  window 0  spike_fn atan alpha 1.5
+    ```
+
+4. Run the following command to evaluate an EAS-SNN model on the GEN-1 dataset:
     ```bash
     python eval_event.py -n e-yolox-m -d 4 -b 36 -c ./YOLOX_outputs/$exp_name/best_ckpt.pth --conf 0.001 \
      --eval_proh  data_num_workers 4 embedding arsnn seed 80 data_name gen1 data_dir /data2/wzm/dataset/GEN1/raw/ \
      num_classes 2 Tm 4 T 3 spike_attach True thresh 1 readout sum embedding_depth 2 embedding_ksize 5 \
     write_zero True use_spike full_spike spike_fn atan
      ```
-4. Consider to modify the hyperparameter Ts to explore the ability for temporal modelling capacity of SNNs as shown in Fig.4 in the paper.
+5. The hyperparameter Ts can be modified to explore the ability for temporal modelling capacity of SNNs as shown in Fig.4 in the paper.
+
 
 
 ## Citation Info
