@@ -105,19 +105,11 @@ def make_parser():
         help="speed test only.",
     )
     parser.add_argument(
-        "--eval_proh",
-        default=False,
-        action="store_true",
-        help="Using the prophesee evaluator",
-    )
-    parser.add_argument( "--grid_search", default=None, type=str, help="summary file path")
-    parser.add_argument(
         "opts",
         help="Modify config options using the command-line",
         default=None,
         nargs=argparse.REMAINDER,
     )
-
     return parser
 
 
@@ -216,13 +208,12 @@ if __name__ == "__main__":
     configure_module()
     args = make_parser().parse_args()
     exp = get_exp(args.exp_file, args.name)
-    exp.eval_proph = args.eval_proh # can be incorporated into the exp file or args.opts
     exp.merge(args.opts)
+
     if not args.experiment_name:
         args.experiment_name = exp.exp_name
 
     num_gpu = torch.cuda.device_count() if args.devices is None else args.devices
-    print(num_gpu,  torch.cuda.device_count())
     assert num_gpu <= torch.cuda.device_count()
 
     dist_url = "auto" if args.dist_url is None else args.dist_url

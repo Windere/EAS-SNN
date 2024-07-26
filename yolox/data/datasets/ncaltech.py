@@ -43,7 +43,6 @@ class NCaltech(torchDataset):
         self.class_names, self.name_to_idx = self.get_cls_names(class_names, root_path)
         self.dtype = np.dtype([("x", int), ("y", int), ("t", int), ("p", int)])
         self.split_dataset(root_path)
-        self.speed_variator = SpeedVariator() if speed_random_aug else None
         self.file_list = None
         with open(os.path.join(root_path, type + '.txt')) as f:
             self.file_list = f.readlines()
@@ -146,9 +145,11 @@ class NCaltech(torchDataset):
             cls_path = os.path.join(data_path, cls_name)
             name_per_cls = list(os.listdir(cls_path))
             random.shuffle(name_per_cls)
-            samples_per_cls = [os.path.join(cls_path, name) for name in name_per_cls]
-            labels_per_cls = [os.path.join(annotation_path, cls_name, name.replace('image', 'annotation')) for name in
-                              name_per_cls]
+            samples_per_cls = [os.path.join(cls_path, name).split(root_path)[-1] for name in name_per_cls]
+            labels_per_cls = [
+                os.path.join(annotation_path, cls_name, name.replace('image', 'annotation')).split(root_path)[-1] for
+                name in
+                name_per_cls]
             sample_label_cls = list(zip(samples_per_cls, labels_per_cls))
             num_train = math.ceil(len(sample_label_cls) * train_ratio)
             num_val = int(len(sample_label_cls) * val_ratio)
@@ -253,7 +254,7 @@ class NCaltech(torchDataset):
             frame = to_voxel_grid_numpy(events, sensor_size=[self.img_size[1], self.img_size[0], 2],
                                         n_time_bins=self.slice_args['micro_slice'])
         elif aggregation == 'timesurface':
-            micro_slices,dt = self.generate_slices(events, self.slice_args['micro_slice'], overlap=0)
+            micro_slices, dt = self.generate_slices(events, self.slice_args['micro_slice'], overlap=0)
             frame = to_timesurface_numpy(micro_slices, sensor_size=[self.img_size[1], self.img_size[0], 2],dt=dt,tau=10e3)
         elif aggregation == 'voxel_cube':
             frame = to_voxel_cube_numpy(events, sensor_size=[self.img_size[1], self.img_size[0], 2],num_slices=self.slice_args['micro_slice'],tbins=2)
@@ -344,7 +345,7 @@ class NCaltech(torchDataset):
         dx = int(self.rand(0, w - nw))
         dy = int(self.rand(0, h - nh))
         new_image = np.zeros([nf, h, w, nc])
-        new_image[:, dy:dy + nh, dx:dx + nw] = image
+        new_image[:, dy:dy + nh, dx:dx + nw] = image  # todo: 同时位移？
         image = new_image
         flip = self.rand() < .5
         if flip: image = np.ascontiguousarray(image[:, :, ::-1, :])

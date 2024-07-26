@@ -8,7 +8,6 @@
 
 @Usage: Adapted from the project of https://github.com/Windere/ASGL-SNN.git
 """
-
 import torch.nn as nn
 import torch
 import numpy as np
@@ -55,7 +54,6 @@ class SigmoidSG(torch.autograd.Function):
 
 class InvRectangle(nn.Module):
     def __init__(self, alpha: float = 1.0, learnable=True, granularity='layer'):
-
         super(InvRectangle, self).__init__()
         self.granularity = granularity
         self.learnable = learnable

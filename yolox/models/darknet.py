@@ -12,11 +12,11 @@ class Darknet(nn.Module):
     depth2blocks = {21: [1, 2, 2, 1], 53: [2, 8, 8, 4]}
 
     def __init__(
-        self,
-        depth,
-        in_channels=3,
-        stem_out_channels=32,
-        out_features=("dark3", "dark4", "dark5"),
+            self,
+            depth,
+            in_channels=3,
+            stem_out_channels=32,
+            out_features=("dark3", "dark4", "dark5"),
     ):
         """
         Args:
@@ -96,13 +96,13 @@ class Darknet(nn.Module):
 
 class CSPDarknet(nn.Module):
     def __init__(
-        self,
-        dep_mul,
-        wid_mul,
-        out_features=("dark3", "dark4", "dark5"),
-        depthwise=False,
-        act="silu",
-        in_dim = 3
+            self,
+            dep_mul,
+            wid_mul,
+            out_features=("dark3", "dark4", "dark5"),
+            depthwise=False,
+            act="silu",
+            in_dim=3
     ):
         super().__init__()
         assert out_features, "please provide output features of Darknet"
@@ -113,8 +113,9 @@ class CSPDarknet(nn.Module):
         base_depth = max(round(dep_mul * 3), 1)  # 3
 
         # stem
-        self.stem = Focus(in_dim, base_channels, ksize=3, act=act) # todo: check here, replace with a conv layer based on YOLO V5
-
+        # self.stem = Focus(in_dim, base_channels, ksize=3,
+        #                   act=act)  # todo: check here, replace with a conv layer based on YOLO V5
+        self.stem = Conv(in_dim, base_channels, ksize=6, stride=2, pad_force=2, act=act)
         # dark2
         self.dark2 = nn.Sequential(
             Conv(base_channels, base_channels * 2, 3, 2, act=act),

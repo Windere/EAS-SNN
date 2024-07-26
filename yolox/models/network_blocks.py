@@ -32,11 +32,13 @@ class BaseConv(nn.Module):
     """A Conv2d -> Batchnorm -> silu/leaky relu block"""
 
     def __init__(
-            self, in_channels, out_channels, ksize, stride, groups=1, bias=False, act="silu"
+            self, in_channels, out_channels, ksize, stride, groups=1, bias=False, act="silu", pad_force=None
     ):
         super().__init__()
         # same padding
         pad = (ksize - 1) // 2
+        if pad_force is not None:
+            pad = pad_force
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,

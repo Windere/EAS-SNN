@@ -126,6 +126,13 @@ class tdLayer(nn.Module):
         self.nb_steps = nb_steps
         self.layer = layer
 
+    # def forward(self, x):
+    #     # print('hello 1')
+    #     out = []
+    #     for step in range(self.nb_steps):
+    #         out.append(self.layer(x[step]))
+    #     return torch.stack(out)
+
     def forward(self, x):
         x = x.contiguous()
         x = self.layer(x.view(-1, *x.shape[2:]))

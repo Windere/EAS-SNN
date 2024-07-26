@@ -33,7 +33,11 @@ class LIFEmbedding(nn.Module):
         self.readout = readout
         self.embedding_conv = tdLayer(self.build_conv(in_channel, out_channel, kernel_size, depth=depth),
                                       nb_steps=self.nb_steps)
+        # tdLayer(nn.Conv2d(in_channel, out_channel, kernel_size=kernel_size, padding=kernel_size // 2),
+        #         nb_steps=self.nb_steps),
+
         self.cell = LIFCell(**kwargs_spikes, return_noreset_v=True)
+        # self.vreset = copy.deepcopy(kwargs_spikes['vreset'])
         self._init_weight()
 
     def _init_weight(self):
@@ -66,7 +70,10 @@ class LIFEmbedding(nn.Module):
         vmem_sum = 0
         spikes = []
         for step in range(self.nb_steps):  # todo: the most heavy step
+            # vmem, spike = self.cell(vmem, x[step])
+            # current = (1 + torch.randn([]) * LIFLayer.sigma).to(x) * x[step]
             vmem, vmem_noreset, spike = self.cell(vmem, events[step])
+            # print((spike - torch.clamp(x[step], min=0, max=1.0)).abs().max())
             vmem_sum += vmem_noreset
         if self.readout == 'sum':
             return vmem_sum
@@ -74,6 +81,8 @@ class LIFEmbedding(nn.Module):
             return vmem
         else:
             raise NotImplementedError
+            # spikes.append(spike * self.cell.thresh)
+        # return self.embedding[-1].vmem  # todo: recovery back to the shape of B*T*C*H*W
 
 
 class AdaptiveRSNNEmbedding(nn.Module):
@@ -95,13 +104,25 @@ class AdaptiveRSNNEmbedding(nn.Module):
         self.vreset = copy.deepcopy(kwargs_spikes['vreset'])
         self.act_fun = copy.deepcopy(self.warp_spike_fn(self.kwargs_spikes['spike_fn']))
         self.depth = int(depth)
-        self.gate_conv = self.build_conv(out_channel, out_channel * 2, kernel_size, depth=self.depth)
-        self.input_conv = self.build_conv(in_channel, out_channel * 2, kernel_size, depth=self.depth)
+        self.inner_net, in_channel = self.build_inner_net(in_channel, out_channel * 2, kernel_size, depth=depth - 1)
+        # print(in_channel, out_channel)
+        self.gate_conv = self.build_conv(out_channel, out_channel * 2, kernel_size, depth=1)
+        # print(in_channel, out_channel)
+        self.input_conv = self.build_conv(in_channel, out_channel * 2, kernel_size, depth=1)
         if self.split:
             self.gate_conv_agg = nn.Conv2d(out_channel, out_channel * 2, kernel_size, padding=kernel_size // 2)
             self.input_conv_agg = nn.Conv2d(in_channel, out_channel * 2, kernel_size, padding=kernel_size // 2)
         self.spike_attach = spike_attach
         self._init_weight()
+
+    def build_inner_net(self, in_channel, out_channel, kernel_size, depth=1):
+        if depth == 0:
+            return nn.Identity(), in_channel
+        else:
+            layers = [SpikingReccurentLayer(kernel_size, in_channel, out_channel, **self.kwargs_spikes)]
+            for _ in range(depth - 1):
+                layers.append(SpikingReccurentLayer(kernel_size, out_channel, out_channel, **self.kwargs_spikes))
+            return nn.Sequential(*layers), out_channel
 
     def build_conv(self, in_channel, out_channel, kernel_size, depth=1):
         convs = [nn.Conv2d(in_channel, out_channel, kernel_size, padding=kernel_size // 2)]
@@ -125,9 +146,19 @@ class AdaptiveRSNNEmbedding(nn.Module):
         for m in self.gate_conv.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, nonlinearity='sigmoid')
+                # nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+        # nn.init.kaiming_uniform_(self.input_conv.weight, nonlinearity='sigmoid')
+        # nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
         if self.split:
             nn.init.kaiming_uniform_(self.input_conv_agg.weight, nonlinearity='sigmoid')
             nn.init.orthogonal_(self.gate_conv_agg.weight, gain=nn.init.calculate_gain('relu'))
+
+    # def _init_weight(self):
+    #     nn.init.kaiming_uniform_(self.gate_conv.weight, nonlinearity='sigmoid')
+    #     nn.init.orthogonal_(self.input_conv.weight, gain=nn.init.calculate_gain('relu'))
+    #     if self.split:
+    #         nn.init.kaiming_uniform_(self.gate_conv_agg.weight, nonlinearity='sigmoid')
+    #         nn.init.orthogonal_(self.input_conv_agg.weight, gain=nn.init.calculate_gain('relu'))
 
     def update(self, vmem, gate, current):
         vmem = gate * vmem + current
@@ -138,12 +169,16 @@ class AdaptiveRSNNEmbedding(nn.Module):
             vmem_update = vmem * (1 - spike) + self.vreset * spike
         return vmem_update, vmem, spike
 
-    def forward(self, events, record=False, v_record=False):
+    def forward(self, events, record=False):
         # print("start embedding")
         shape = None
         if events.dim() < 5:  # handle with the input for prameter registering
             events, _ = torch.broadcast_tensors(events, torch.zeros((self.Ts,) + events.shape))
             return events
+            # events = events.transpose(0, 1)
+            # events = events.unsqueeze(0)
+        # else:
+        #     events = events.transpose(0, 1)
         elif events.dim() > 5:  # handle with the input for prameter registering
             # B*T*T'*C*H*W,
             shape = events.shape[:-4]
@@ -166,7 +201,7 @@ class AdaptiveRSNNEmbedding(nn.Module):
         vmem_avg = torch.zeros_like(events[0])  # memory for the ouptut of the embedding
         t_last = torch.zeros_like(events[0]).long() - 1
         t_record = []
-        v_record_list = []
+        events = self.inner_net(events)
         for t in range(self.nb_steps):
             state = self.gate_conv(spike_last)
             g_rec, c_rec = state.chunk(2, dim=-3)
@@ -176,8 +211,17 @@ class AdaptiveRSNNEmbedding(nn.Module):
             current = (c_in + c_rec)
             # todo: should call hard reset to clear the history
             vmem, vmem_no_reset, spike_last = self.update(vmem, gate, current)
+            # if self.split:
+            #     state_agg = self.gate_conv_agg(spike_last_agg)
+            #     g_rec_agg, c_rec_agg = state_agg.chunk(2, dim=-3)
+            #     inpt_agg = self.input_conv_agg(events[t])
+            #     g_in_agg, c_in_agg = inpt_agg.chunk(2, dim=-3)
+            #     gate_agg = torch.sigmoid(g_in_agg + g_rec_agg)
+            #     current_agg = (c_in_agg + c_rec_agg)
+            #     vmem_agg, vmem_no_reset_agg, spike_last_agg = self.update(vmem_agg, gate_agg, current_agg)
+            #     vmem_avg += vmem_no_reset_agg
+            # else:
             vmem_avg += vmem_no_reset
-            v_record_list.append(vmem_no_reset[(1 - spike_last).bool()])
             spike_pos = spike_last.nonzero()
             seg_pos = seg_ind[spike_pos[:, 0], spike_pos[:, 1], spike_pos[:, 2], spike_pos[:, 3]]
             valid_pos = seg_pos < self.Ts
@@ -212,36 +256,43 @@ class AdaptiveRSNNEmbedding(nn.Module):
             v = vmem_avg[no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]] / (
                     self.nb_steps - 1 - t_last[
                 no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]])
+            # v *=  spike_last[
+            #      no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]]
         if self.write_zero:
+            # print('write zero')
             v *= 0
+            # v *= spike_last[no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]]
+        # else:
+        #     if self.spike_attach:
+        #         v *= (1 - spike_last[no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]])
+        # if self.write_zero:
+        #     v = 0
+        # print(v)
         aggregation[seg_pos, no_spike_pos[:, 0], no_spike_pos[:, 1], no_spike_pos[:, 2], no_spike_pos[:, 3]] += v
         if self.abs:
             # print('use abs')
             aggregation = torch.nn.functional.relu(aggregation)
         if record:
             return aggregation, torch.stack(t_record, axis=0)
-        elif v_record:
-            return aggregation, torch.concatenate(v_record_list)
         else:
             return aggregation
 
 
-class SpikingEmbedding(nn.Module):
-    def __init__(self, kernel_size, in_channel=2, out_channel=2, readout='sum', relu=False, depth=1, **kwargs_spikes):
-        super(SpikingEmbedding, self).__init__()
+class SpikingReccurentLayer(nn.Module):
+    def __init__(self, kernel_size, in_channel=2, out_channel=2, **kwargs_spikes):
+        super(SpikingReccurentLayer, self).__init__()
         self.kernel_size = kernel_size
         self.kwargs_spikes = kwargs_spikes
-        self.readout = readout
-        self.relu = relu
-        self.depth = depth
         self.nb_steps = kwargs_spikes['nb_steps'] if 'Tm' not in kwargs_spikes else kwargs_spikes['Tm']
         self.thresh = kwargs_spikes['thresh']
         self.vreset = copy.deepcopy(kwargs_spikes['vreset'])
         self.act_fun = copy.deepcopy(self.warp_spike_fn(self.kwargs_spikes['spike_fn']))
+        # self.gate_conv = nn.Conv2d(out_channel, out_channel * 2, kernel_size, padding=kernel_size // 2)
+        # self.input_conv = tdLayer(nn.Conv2d(in_channel, out_channel * 2, kernel_size, padding=kernel_size // 2),
         #                           nb_steps=self.nb_steps)
-        self.input_conv = tdLayer(self.build_conv(in_channel, out_channel * 2, kernel_size, depth=self.depth),
+        self.input_conv = tdLayer(self.build_conv(in_channel, out_channel * 2, kernel_size, depth=1),
                                   nb_steps=self.nb_steps)
-        self.gate_conv = self.build_conv(out_channel, out_channel * 2, kernel_size, depth=self.depth)
+        self.gate_conv = self.build_conv(out_channel, out_channel * 2, kernel_size, depth=1)
 
         self._init_weight()
 
@@ -268,6 +319,137 @@ class SpikingEmbedding(nn.Module):
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_uniform_(m.weight, nonlinearity='sigmoid')
 
+                # nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+        # # nn.init.kaiming_uniform_(self.input_conv.weight, nonlinearity='sigmoid')
+        # # nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+        # if self.split:
+        #     nn.init.kaiming_uniform_(self.input_conv_agg.weight, nonlinearity='sigmoid')
+        #     nn.init.orthogonal_(self.gate_conv_agg.weight, gain=nn.init.calculate_gain('relu'))
+
+        # def _init_weight(self):
+        #     for m in self.input_conv.modules():
+        #         if isinstance(m, nn.Conv2d):
+        #             nn.init.kaiming_uniform_(m.weight, nonlinearity='sigmoid')
+        #     for m in self.gate_conv.modules():
+        #         if isinstance(m, nn.Conv2d):
+        #             nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+        # nn.init.kaiming_uniform_(self.input_conv.weight, nonlinearity='sigmoid')
+        # nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+
+        # def _init_weight(self):
+        #     nn.init.kaiming_uniform_(self.input_conv.layer.weight, nonlinearity='sigmoid')
+        #     nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+        #     # nn.init.kaiming_uniform_(self.gate_conv.weight, nonlinearity='sigmoid')
+        #     # nn.init.orthogonal_(self.input_conv.layer.weight, gain=nn.init.calculate_gain('relu'))
+
+    def update(self, vmem, gate, current):
+        vmem_noreset = gate * vmem + current
+        spike = self.act_fun(vmem_noreset - self.thresh)
+        if self.vreset is None:
+            vmem_update = vmem_noreset - self.thresh * spike
+        else:
+            vmem_update = vmem_noreset * (1 - spike) + self.vreset * spike
+        return vmem_update, vmem_noreset, spike
+
+    def forward(self, events):
+        shape = None
+        input = self.input_conv(events)
+        gs_in, cs_in = input.chunk(2, dim=-3)
+        spike_last = torch.zeros_like(gs_in[0])
+        vmem = torch.zeros_like(gs_in[0])
+        vmem_sum = 0
+        outputs = []
+        for t in range(self.nb_steps):
+            state = self.gate_conv(spike_last)
+            g_rec, c_rec = state.chunk(2, dim=-3)
+            gate = torch.sigmoid(gs_in[t] + g_rec)
+            current = (cs_in[t] + c_rec)
+            vmem, vmem_noreset, spike_last = self.update(vmem, gate, current)
+            outputs.append(spike_last)
+        outputs = torch.stack(outputs, axis=0)
+        return outputs
+
+
+class SpikingEmbedding(nn.Module):
+    # todo: adaptive threshholding
+    # todo: denoise with knowledge info
+    # todo:
+    def __init__(self, kernel_size, in_channel=2, out_channel=2, readout='sum', relu=False, depth=1, **kwargs_spikes):
+        super(SpikingEmbedding, self).__init__()
+        self.kernel_size = kernel_size
+        self.kwargs_spikes = kwargs_spikes
+        self.readout = readout
+        self.relu = relu
+        self.depth = depth
+        self.nb_steps = kwargs_spikes['nb_steps'] if 'Tm' not in kwargs_spikes else kwargs_spikes['Tm']
+        self.thresh = kwargs_spikes['thresh']
+        self.vreset = copy.deepcopy(kwargs_spikes['vreset'])
+        self.act_fun = copy.deepcopy(self.warp_spike_fn(self.kwargs_spikes['spike_fn']))
+        # self.gate_conv = nn.Conv2d(out_channel, out_channel * 2, kernel_size, padding=kernel_size // 2)
+        # self.input_conv = tdLayer(nn.Conv2d(in_channel, out_channel * 2, kernel_size, padding=kernel_size // 2),
+        #                           nb_steps=self.nb_steps)
+        self.inner_net, in_channel = self.build_inner_net(in_channel, out_channel * 2, kernel_size, depth=depth - 1)
+        self.input_conv = tdLayer(self.build_conv(in_channel, out_channel * 2, kernel_size, depth=1),
+                                  nb_steps=self.nb_steps)
+        self.gate_conv = self.build_conv(out_channel, out_channel * 2, kernel_size, depth=1)
+
+        self._init_weight()
+
+    def warp_spike_fn(self, spike_fn):
+        if isinstance(spike_fn, nn.Module):
+            return copy.deepcopy(spike_fn)
+        elif issubclass(spike_fn, torch.autograd.Function):
+            return spike_fn.apply
+        elif issubclass(spike_fn, torch.nn.Module):
+            return spike_fn()
+
+    def build_inner_net(self, in_channel, out_channel, kernel_size, depth=1):
+        if depth == 0:
+            return nn.Identity(), in_channel
+        else:
+            layers = [SpikingReccurentLayer(kernel_size, in_channel, out_channel, **self.kwargs_spikes)]
+            for _ in range(depth - 1):
+                layers.append(SpikingReccurentLayer(kernel_size, out_channel, out_channel, **self.kwargs_spikes))
+            return nn.Sequential(*layers), out_channel
+
+    def build_conv(self, in_channel, out_channel, kernel_size, depth=1):
+        convs = [nn.Conv2d(in_channel, out_channel, kernel_size, padding=kernel_size // 2)]
+        for _ in range(depth - 1):
+            convs.append(nn.ReLU(inplace=True))
+            convs.append(nn.Conv2d(out_channel, out_channel, kernel_size, padding=kernel_size // 2))
+        return nn.Sequential(*convs)
+
+    def _init_weight(self):
+        for m in self.input_conv.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+        for m in self.gate_conv.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_uniform_(m.weight, nonlinearity='sigmoid')
+
+                # nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+        # # nn.init.kaiming_uniform_(self.input_conv.weight, nonlinearity='sigmoid')
+        # # nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+        # if self.split:
+        #     nn.init.kaiming_uniform_(self.input_conv_agg.weight, nonlinearity='sigmoid')
+        #     nn.init.orthogonal_(self.gate_conv_agg.weight, gain=nn.init.calculate_gain('relu'))
+
+    # def _init_weight(self):
+    #     for m in self.input_conv.modules():
+    #         if isinstance(m, nn.Conv2d):
+    #             nn.init.kaiming_uniform_(m.weight, nonlinearity='sigmoid')
+    #     for m in self.gate_conv.modules():
+    #         if isinstance(m, nn.Conv2d):
+    #             nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain('relu'))
+    # nn.init.kaiming_uniform_(self.input_conv.weight, nonlinearity='sigmoid')
+    # nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+
+    # def _init_weight(self):
+    #     nn.init.kaiming_uniform_(self.input_conv.layer.weight, nonlinearity='sigmoid')
+    #     nn.init.orthogonal_(self.gate_conv.weight, gain=nn.init.calculate_gain('relu'))
+    #     # nn.init.kaiming_uniform_(self.gate_conv.weight, nonlinearity='sigmoid')
+    #     # nn.init.orthogonal_(self.input_conv.layer.weight, gain=nn.init.calculate_gain('relu'))
+
     def update(self, vmem, gate, current):
         vmem_noreset = gate * vmem + current
         spike = self.act_fun(vmem_noreset - self.thresh)
@@ -281,6 +463,10 @@ class SpikingEmbedding(nn.Module):
         shape = None
         if events.dim() < 5:  # handle with the input for prameter registering
             events, _ = torch.broadcast_tensors(events, torch.zeros((self.nb_steps,) + events.shape))
+            # events = events.transpose(0, 1)
+            # events = events.unsqueeze(0)
+        # else:
+        #     events = events.transpose(0, 1)
         elif events.dim() > 5:  # handle with the input for prameter registering
             shape = events.shape[:-4]
             events = events.flatten(end_dim=-5)
@@ -289,6 +475,8 @@ class SpikingEmbedding(nn.Module):
             events = events.transpose(0, 1)
         indices = torch.arange(events.size(0) - 1, -1, -1).to(events.device)
         events = torch.index_select(events, 0, indices)
+        events = self.inner_net(events)
+        # print(events.unique())
         input = self.input_conv(events)
         gs_in, cs_in = input.chunk(2, dim=-3)
         spike_last = torch.zeros_like(gs_in[0])

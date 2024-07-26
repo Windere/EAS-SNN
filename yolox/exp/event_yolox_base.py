@@ -29,7 +29,6 @@ class EventExp(BaseExp):
         # activation name. For example, if using "relu", then "silu" will be replaced to "relu".
         self.act = "silu"  # todo: modify it into spiking function
         self.use_spike = "False"
-        self.eval_proph = False
         self.alpha = 2.0
         self.in_dim = 2
         self.aggregation = 'micro_sum'  # the early event representation method,
@@ -207,7 +206,8 @@ class EventExp(BaseExp):
             elif 'full_spike' in self.use_spike:
                 backbone = convert_to_spiking(backbone, spike_fn=self.get_act_func())
                 head = SpikingYOLOXHead(self.num_classes, self.width, in_channels=in_channels, act=self.act,
-                                        spike_fn=self.get_act_func(), full_spike=('v2' in self.use_spike))
+                                        spike_fn=self.get_act_func(), use_full_spike=('v2' in self.use_spike))
+
                 self.model = SpikingYOLOX(backbone, head, embedding, T=self.T)
             elif self.use_spike is False or (self.use_spike == 'False'):
                 head = YOLOXHead(self.num_classes, self.width, in_channels=in_channels, act=self.act)
@@ -486,7 +486,7 @@ class EventExp(BaseExp):
 
         with wait_for_the_master():
             valdataset = self.get_eval_dataset(**kwargs)
-        batch_size *= 2
+        batch_size *= 4
         if is_distributed:
             batch_size = batch_size // dist.get_world_size()
             sampler = torch.utils.data.distributed.DistributedSampler(
@@ -509,7 +509,7 @@ class EventExp(BaseExp):
     def get_evaluator(self, batch_size, is_distributed, testdev=False, legacy=False):
         from yolox.evaluators import EventEvaluator, PSEEEvaluator
 
-        if 'gen' in self.data_name and self.eval_proph:
+        if 'gen' in self.data_name:
             return PSEEEvaluator(
                 dataloader=self.get_eval_loader(batch_size, is_distributed,
                                                 testdev=testdev, legacy=legacy),
@@ -520,7 +520,6 @@ class EventExp(BaseExp):
                 testdev=testdev,
                 snn_reset=self.use_spike,
                 dataset=self.data_name,
-                downsample_by_2=(self.data_name == 'gen4')
             )
         return EventEvaluator(
             dataloader=self.get_eval_loader(batch_size, is_distributed,

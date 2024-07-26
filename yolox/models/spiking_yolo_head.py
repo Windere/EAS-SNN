@@ -25,7 +25,7 @@ class SpikingYOLOXHead(nn.Module):
             act="silu",
             depthwise=False,
             spike_fn=None,
-            full_spike=False
+            use_full_spike = False
     ):
         """
         Args:
@@ -36,7 +36,7 @@ class SpikingYOLOXHead(nn.Module):
 
         self.num_classes = num_classes
         self.decode_in_inference = True  # for deploy, set to False
-
+        self.use_full_spike = use_full_spike
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         self.cls_preds = nn.ModuleList()
@@ -122,9 +122,8 @@ class SpikingYOLOXHead(nn.Module):
                     padding=0,
                 )
             )
-        self.full_spike = full_spike
-        if full_spike:
-            convert_to_spiking(self, spike_fn=spike_fn)
+        if self.use_full_spike:
+            convert_to_spiking(self, spike_fn = spike_fn)
         self.use_l1 = False
         self.l1_loss = nn.L1Loss(reduction="none")
         self.bcewithlog_loss = nn.BCEWithLogitsLoss(reduction="none")
@@ -156,7 +155,7 @@ class SpikingYOLOXHead(nn.Module):
                 zip(self.cls_convs, self.reg_convs, self.strides, xin)
         ):
             # x = torch.nan_to_num(x, nan=0.0)
-            if not self.full_spike:
+            if not self.use_full_spike:
                 x = x.mean(axis=0)
             x = self.stems[k](x)
             cls_x = x
@@ -172,7 +171,7 @@ class SpikingYOLOXHead(nn.Module):
 
             # firing rate or average currents for the last layer
             # more readout comparision method could be found in ref: DTYolo
-            if self.full_spike:
+            if self.use_full_spike:
                 cls_output = cls_output.mean(axis=0)
                 reg_output = reg_output.mean(axis=0)
                 obj_output = obj_output.mean(axis=0)
