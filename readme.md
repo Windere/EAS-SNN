@@ -2,11 +2,12 @@
 <p align="center">
   <img src="./docs/view.png" width="750">
 </p>
-This is the official Pytorch implementation of the ECCV 2024 paper: <a href="https://arxiv.org/abs/2403.12574" target="_blank">EAS-SNN: End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks</a>
+This is the official Pytorch implementation of the ECCV 2024 paper: <a href="https://www.ecva.net/papers/eccv_2024/papers_ECCV/papers/07766.pdf" target="_blank">EAS-SNN: End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks</a>
 
 
- **Summary:** In this study, we discover that the neural dynamics of spiking neurons align closely with the behavior of an ideal temporal event sampler. Motivated by this, we propose a novel adaptive sampling module that leverages recurrent convolutional SNNs enhanced with temporal memory, facilitating a fully end-to-end learnable framework for event-based detection. Additionally, we introduce Residual Potential Dropout (RPD) and Spike-Aware Training (SAT) to regulate potential distribution and address performance degradation encountered in spike-based sampling modules.  
-
+ **Summary:** 
+ In this study, we discover that the neural dynamics of spiking neurons align closely with the behavior of an ideal temporal event sampler. Motivated by this, we propose a novel adaptive sampling module that leverages recurrent convolutional SNNs enhanced with temporal memory, facilitating a fully end-to-end learnable framework for event-based detection. Additionally, we introduce Residual Potential Dropout (RPD) and Spike-Aware Training (SAT) to regulate potential distribution and address performance degradation encountered in spike-based sampling modules.  Empirical evaluation on neuromorphic detection datasets demonstrates that our approach outperforms existing state-of-the-art spike-based methods with significantly fewer parameters and time steps. For instance, our method yields a 4.4% mAP improvement on the Gen1 dataset, while requiring 38% fewer parameters and only three time steps. Moreover, the applicability and effectiveness of our adaptive sampling methodology extend beyond SNNs, as demonstrated through further validation
+on conventional non-spiking models.
 
 ## Installation
 The main dependencies are listed below:
@@ -83,6 +84,12 @@ After unzipping the dataset, you should have the following directory structure:
     │   │   │   │   ├──  ...
 
  ```
+## Pre-trained Checkpoints & Logs
+|  NCaltech, SYOLOX-M | Gen1, SYOLOX-S | Gen1, SYOLOX-M | 1MPX, SYOLOX-M |
+|----------|----------|----------|----------|
+|   [download](https://drive.google.com/drive/folders/1x9hEhnjlGFbu-lQCSgibaNALKyKy0-qU?usp=sharing)  |   [download](https://drive.google.com/drive/folders/1xEtCHtyNLfMP569oUE9R2t5q2bus3EPN?usp=drive_link)  |   [download](https://drive.google.com/drive/folders/1zAXB3nz_pCmhPDtTHuKorRiK1YhRu6ki?usp=drive_link)   |   [download](https://drive.google.com/drive/folders/1Yqm91Dir7F6cdRlUC1aD_ozEpW0DypAl?usp=drive_link)  |
+25.3M | 8.92M | 25.3M | 25.3M
+| 
 
 ## Usage
 1. First, install all required packages and cd to the 'tools' directory.
