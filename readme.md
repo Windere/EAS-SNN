@@ -85,11 +85,36 @@ After unzipping the dataset, you should have the following directory structure:
 
  ```
 ## Pre-trained Checkpoints & Logs
-|  NCaltech, SYOLOX-M | Gen1, SYOLOX-S | Gen1, SYOLOX-M | 1MPX, SYOLOX-M |
+<table>
+  <tbody>
+    <tr>
+      <th valign="bottom"></th>
+      <th valign="bottom">NCaltech, SYOLOX-M</th>
+      <th valign="bottom">Gen1, SYOLOX-S</th>
+      <th valign="bottom">Gen1, SYOLOX-M</th>
+      <th valign="bottom">1MPX, SYOLOX-M</th>
+    </tr>
+    <tr>
+      <td align="left">pre-trained checkpoint</td>
+      <td align="center"><a href="https://drive.google.com/drive/folders/1x9hEhnjlGFbu-lQCSgibaNALKyKy0-qU?usp=sharing">download</a></td>
+      <td align="center"><a href="https://drive.google.com/drive/folders/1xEtCHtyNLfMP569oUE9R2t5q2bus3EPN?usp=drive_link">download</a></td>
+      <td align="center"><a href="https://drive.google.com/drive/folders/1zAXB3nz_pCmhPDtTHuKorRiK1YhRu6ki?usp=drive_link">download</a></td>
+      <td align="center"><a href="https://drive.google.com/drive/folders/1Yqm91Dir7F6cdRlUC1aD_ozEpW0DypAl?usp=drive_link">download</a></td>
+    </tr>
+    <tr>
+      <td align="left">size</td>
+      <td align="center"><tt>25.3M</tt></td>
+      <td align="center"><tt>8.92M</tt></td>
+      <td align="center"><tt>25.3M</tt></td>
+      <td align="center"><tt>25.3M</tt></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- |  NCaltech, SYOLOX-M | Gen1, SYOLOX-S | Gen1, SYOLOX-M | 1MPX, SYOLOX-M |
 |----------|----------|----------|----------|
 |   [download](https://drive.google.com/drive/folders/1x9hEhnjlGFbu-lQCSgibaNALKyKy0-qU?usp=sharing)  |   [download](https://drive.google.com/drive/folders/1xEtCHtyNLfMP569oUE9R2t5q2bus3EPN?usp=drive_link)  |   [download](https://drive.google.com/drive/folders/1zAXB3nz_pCmhPDtTHuKorRiK1YhRu6ki?usp=drive_link)   |   [download](https://drive.google.com/drive/folders/1Yqm91Dir7F6cdRlUC1aD_ozEpW0DypAl?usp=drive_link)  |
-25.3M | 8.92M | 25.3M | 25.3M
-| 
+25.3M | 8.92M | 25.3M | 25.3M -->
 
 ## Usage
 1. First, install all required packages and cd to the 'tools' directory.
