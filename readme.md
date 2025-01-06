@@ -1,4 +1,7 @@
 # EAS-SNN: End-to-End Adaptive Sampling and Representation for Event-based Detection with Recurrent Spiking Neural Networks
+**直接fork了原作者仓库**
+修改readme测试一下push是否成功
+
 <p align="center">
   <img src="./docs/view.png" width="750">
 </p>
